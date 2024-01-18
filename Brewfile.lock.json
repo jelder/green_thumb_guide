@@ -1,0 +1,27 @@
+{
+  "entries": {
+    "tap": {
+      "cargo-lambda/cargo-lambda": {
+        "revision": "7721f89f74b3655cfae060ce60f4675c30d77d2f"
+      }
+    },
+    "brew": {
+      "cargo-lambda": {
+        "version": "1.0.1.apple",
+        "bottle": false
+      }
+    }
+  },
+  "system": {
+    "macos": {
+      "sonoma": {
+        "HOMEBREW_VERSION": "4.2.4",
+        "HOMEBREW_PREFIX": "/opt/homebrew",
+        "Homebrew/homebrew-core": "api",
+        "CLT": "",
+        "Xcode": "15.2",
+        "macOS": "14.2.1"
+      }
+    }
+  }
+}
