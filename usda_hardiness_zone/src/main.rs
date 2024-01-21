@@ -1,36 +1,88 @@
-use lambda_http::{run, service_fn, Body, Error, Request, RequestExt, Response};
+use axum::body::Body;
+use axum::extract::State;
+use axum::http::header::{ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_TYPE, ORIGIN};
+use axum::response::IntoResponse;
+use axum::{
+    routing::{get, post},
+    Json, Router,
+};
+use hyper::Request;
+use hyper::StatusCode;
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, Mutex};
+use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
 
-/// This is the main body for the function.
-/// Write your code inside it.
-/// There are some code example in the following URLs:
-/// - https://github.com/awslabs/aws-lambda-rust-runtime/tree/main/examples
-async fn function_handler(event: Request) -> Result<Response<Body>, Error> {
-    // Extract some useful information from the request
-    let who = event
-        .query_string_parameters_ref()
-        .and_then(|params| params.first("name"))
-        .unwrap_or("world");
-    let message = format!("Hello {who}, this is an AWS Lambda HTTP request");
+#[derive(Default)]
+struct AppState {
+    data: Vec<Data>,
+}
 
-    // Return something that implements IntoResponse.
-    // It will be serialized to the right response event automatically by the runtime
-    let resp = Response::builder()
-        .status(200)
-        .header("content-type", "text/html")
-        .body(message.into())
-        .map_err(Box::new)?;
-    Ok(resp)
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct Data {
+    name: String,
+}
+
+async fn post_data(
+    State(state): State<Arc<Mutex<AppState>>>,
+    Json(payload): Json<Data>,
+) -> impl IntoResponse {
+    let mut state = state.lock().unwrap();
+    state.data.push(payload);
+    StatusCode::CREATED
+}
+
+async fn get_data(State(state): State<Arc<Mutex<AppState>>>) -> impl IntoResponse {
+    let state = state.lock().unwrap();
+    (StatusCode::OK, Json(state.data.clone()))
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error> {
+async fn main() {
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        // disable printing the name of the module in every log line.
-        .with_target(false)
-        // disabling time is handy because CloudWatch will add the ingestion time.
+        .with_ansi(false)
         .without_time()
+        .with_max_level(tracing::Level::INFO)
+        .json()
         .init();
 
-    run(service_fn(function_handler)).await
+    let state = Arc::new(Mutex::new(AppState::default()));
+
+    // Trace every request
+    let trace_layer =
+        TraceLayer::new_for_http().on_request(|_: &Request<Body>, _: &tracing::Span| {
+            tracing::info!(message = "begin request!")
+        });
+
+    // Set up CORS
+    let cors_layer = CorsLayer::new()
+        .allow_headers([ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_TYPE, ORIGIN])
+        .allow_methods(tower_http::cors::Any)
+        .allow_origin(tower_http::cors::Any);
+
+    // Wrap an `axum::Router` with our state, CORS, Tracing, & Compression layers
+    let app = Router::new()
+        .route("/", post(post_data))
+        .route("/", get(get_data))
+        .layer(cors_layer)
+        .layer(trace_layer)
+        .layer(CompressionLayer::new().gzip(true).deflate(true))
+        .with_state(state);
+
+    #[cfg(debug_assertions)]
+    {
+        let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
+        let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+        axum::serve(listener, app).await.unwrap();
+    }
+
+    // If we compile in release mode, use the Lambda Runtime
+    #[cfg(not(debug_assertions))]
+    {
+        // To run with AWS Lambda runtime, wrap in our `LambdaLayer`
+        let app = tower::ServiceBuilder::new()
+            .layer(axum_aws_lambda::LambdaLayer::default())
+            .service(app);
+
+        lambda_http::run(app).await.unwrap();
+    }
 }
