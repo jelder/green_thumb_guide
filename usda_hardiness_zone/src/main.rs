@@ -1,72 +1,43 @@
 use axum::body::Body;
-use axum::extract::State;
-use axum::http::header::{ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_TYPE, ORIGIN};
-use axum::response::IntoResponse;
 use axum::{
-    routing::{get, post},
-    Json, Router,
+    routing::get,
+    // Json,
+    Router,
 };
 use hyper::Request;
-use hyper::StatusCode;
-use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
-use tower_http::{compression::CompressionLayer, cors::CorsLayer, trace::TraceLayer};
+// use hyper::StatusCode;
+// use serde::{Deserialize, Serialize};
+use tower_http::{compression::CompressionLayer, trace::TraceLayer};
+use sqlx::{Connection, SqliteConnection};
 
-#[derive(Default)]
-struct AppState {
-    data: Vec<Data>,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-struct Data {
-    name: String,
-}
-
-async fn post_data(
-    State(state): State<Arc<Mutex<AppState>>>,
-    Json(payload): Json<Data>,
-) -> impl IntoResponse {
-    let mut state = state.lock().unwrap();
-    state.data.push(payload);
-    StatusCode::CREATED
-}
-
-async fn get_data(State(state): State<Arc<Mutex<AppState>>>) -> impl IntoResponse {
-    let state = state.lock().unwrap();
-    (StatusCode::OK, Json(state.data.clone()))
-}
+const DATABASE: &'static [u8] = include_bytes!("../hardiness.db");
 
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt()
-        .with_ansi(false)
         .without_time()
         .with_max_level(tracing::Level::INFO)
         .json()
         .init();
 
-    let state = Arc::new(Mutex::new(AppState::default()));
 
     // Trace every request
     let trace_layer =
         TraceLayer::new_for_http().on_request(|_: &Request<Body>, _: &tracing::Span| {
-            tracing::info!(message = "begin request!")
+            tracing::info!(message = "begin request")
         });
 
-    // Set up CORS
-    let cors_layer = CorsLayer::new()
-        .allow_headers([ACCEPT, ACCEPT_ENCODING, AUTHORIZATION, CONTENT_TYPE, ORIGIN])
-        .allow_methods(tower_http::cors::Any)
-        .allow_origin(tower_http::cors::Any);
+    let memory_database = SqliteConnection::connect(":memory:").await.unwrap();
+    memory_database.execute(sqlx::query("ATTACH DATABASE ? AS embedded", DATABASE)).await.unwrap();
+
+    async fn get_zone_by_zipcode() -> &'static str {
+    }
 
     // Wrap an `axum::Router` with our state, CORS, Tracing, & Compression layers
     let app = Router::new()
-        .route("/", post(post_data))
-        .route("/", get(get_data))
-        .layer(cors_layer)
+        .route("/", get(get_zone_by_zipcode))
         .layer(trace_layer)
-        .layer(CompressionLayer::new().gzip(true).deflate(true))
-        .with_state(state);
+        .layer(CompressionLayer::new().gzip(true).deflate(true));
 
     #[cfg(debug_assertions)]
     {
