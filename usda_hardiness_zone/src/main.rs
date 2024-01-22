@@ -1,43 +1,85 @@
-use axum::body::Body;
+use axum::response::IntoResponse;
+use axum::response::Response;
 use axum::{
     routing::get,
-    // Json,
+    Json,
     Router,
+    extract::{Query, Extension},
+    debug_handler,
 };
-use hyper::Request;
-// use hyper::StatusCode;
-// use serde::{Deserialize, Serialize};
-use tower_http::{compression::CompressionLayer, trace::TraceLayer};
-use sqlx::{Connection, SqliteConnection};
+use hyper::StatusCode;
+use serde::{Deserialize, Serialize};
+use sqlx::sqlite::SqlitePool;
 
-const DATABASE: &'static [u8] = include_bytes!("../hardiness.db");
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct ZipcodeLookupQuery {
+    q: String,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+struct ZipcodeLookupResult {
+    zone: String,
+    min_temp_f: f64,
+    min_temp_c: f64,
+}
+
+#[derive(Deserialize)]
+struct QueryParams {
+    q: String,
+}
+
+struct HardinessZone {
+    id: String,
+    min_temp_f: f64,
+}
+
+fn fahrenheit_to_celsius(fahrenheit: f64) -> f64 {
+    (fahrenheit - 32.0) * 5.0 / 9.0
+}
+
+impl From<HardinessZone> for ZipcodeLookupResult {
+    fn from(hardiness_zone: HardinessZone) -> Self {
+        ZipcodeLookupResult {
+            zone: hardiness_zone.id.to_string(),
+            min_temp_f: hardiness_zone.min_temp_f,
+            min_temp_c: fahrenheit_to_celsius(hardiness_zone.min_temp_f),
+        }
+    }
+}
+
+#[debug_handler]
+async fn lookup_by_zipcode(
+    Query(params): Query<QueryParams>,
+    Extension(pool): Extension<SqlitePool>,
+) -> Response {
+    
+    let hardiness_zone = sqlx::query_as!(HardinessZone, "select zones.* from zones join zone_zipcodes on zone_id = zones.id where zipcode = $1", params.q)
+        .fetch_optional(&pool)
+        .await;
+
+    match hardiness_zone {
+        Ok(Some(zone)) => {
+            let result = ZipcodeLookupResult::from(zone);
+            Json(result).into_response()
+        },
+        Err(err) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
+        },
+        _ => {
+            StatusCode::NOT_FOUND.into_response()
+        }
+    }
+
+}
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt()
-        .without_time()
-        .with_max_level(tracing::Level::INFO)
-        .json()
-        .init();
+    // Connect to SQLite database
+    let pool = SqlitePool::connect("./hardiness.db").await.unwrap();
 
-
-    // Trace every request
-    let trace_layer =
-        TraceLayer::new_for_http().on_request(|_: &Request<Body>, _: &tracing::Span| {
-            tracing::info!(message = "begin request")
-        });
-
-    let memory_database = SqliteConnection::connect(":memory:").await.unwrap();
-    memory_database.execute(sqlx::query("ATTACH DATABASE ? AS embedded", DATABASE)).await.unwrap();
-
-    async fn get_zone_by_zipcode() -> &'static str {
-    }
-
-    // Wrap an `axum::Router` with our state, CORS, Tracing, & Compression layers
     let app = Router::new()
-        .route("/", get(get_zone_by_zipcode))
-        .layer(trace_layer)
-        .layer(CompressionLayer::new().gzip(true).deflate(true));
+        .route("/", get(lookup_by_zipcode))
+        .layer(Extension(pool));
 
     #[cfg(debug_assertions)]
     {
