@@ -10,6 +10,7 @@ use axum::{
 use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
+use std::path::Path;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct ZipcodeLookupQuery {
@@ -75,7 +76,9 @@ async fn lookup_by_zipcode(
 #[tokio::main]
 async fn main() {
     // Connect to SQLite database
-    let pool = SqlitePool::connect("./hardiness.db").await.unwrap();
+    let pool = SqlitePool::connect(
+        &first_existing_path(&vec!["/opt/database/hardiness.db", "/opt/hardiness.db", "./hardiness.db"]).expect("Could not find database")
+    ).await.unwrap();
 
     let app = Router::new()
         .route("/", get(lookup_by_zipcode))
@@ -98,4 +101,11 @@ async fn main() {
 
         lambda_http::run(app).await.unwrap();
     }
+}
+
+
+fn first_existing_path(paths: &[&str]) -> Option<String> {
+    paths.iter()
+         .find(|&&path| Path::new(path).exists())
+         .map(|&path| path.to_string())
 }

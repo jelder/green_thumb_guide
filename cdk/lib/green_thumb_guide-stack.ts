@@ -2,7 +2,7 @@ import { Stack, StackProps, CfnOutput, Duration } from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { RustFunction } from 'rust.aws-cdk-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
-import * as aws_lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as apig from 'aws-cdk-lib/aws-apigatewayv2';
 import * as apigIntegrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as route53 from 'aws-cdk-lib/aws-route53';
@@ -20,15 +20,20 @@ export class GreenThumbGuideStack extends Stack {
 
     const fqdn = `${props.subdomain}.${props.domain}`;
 
+    const databaseLayer = new lambda.LayerVersion(this, 'DatabaseLayer', {
+      code: lambda.Code.fromAsset('../usda_hardiness_zone/database.zip'),
+    })
+
     const hardinessZoneFunction = new RustFunction(this, "USDAHardinessZoneFunction", {
       directory: "../usda_hardiness_zone/",
       logGroup: new logs.LogGroup(this, 'USDAHardinessZoneFunctionLogGroup'),
       timeout: Duration.seconds(3),
+      layers: [databaseLayer]
     })
 
-    const hardinessZoneFunctionUrl = new aws_lambda.FunctionUrl(this, "USDAHardinessZoneFunctionUrl", {
+    const hardinessZoneFunctionUrl = new lambda.FunctionUrl(this, "USDAHardinessZoneFunctionUrl", {
       function: hardinessZoneFunction,
-      authType: aws_lambda.FunctionUrlAuthType.NONE,
+      authType: lambda.FunctionUrlAuthType.NONE,
     })
     new CfnOutput(this, 'url', { value: hardinessZoneFunctionUrl.url });
 
