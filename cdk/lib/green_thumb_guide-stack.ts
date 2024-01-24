@@ -48,6 +48,11 @@ export class GreenThumbGuideStack extends Stack {
       methods: [apig.HttpMethod.GET],
       integration: new apigIntegrations.HttpLambdaIntegration('LambdaIntegration', hardinessZoneFunction),
     });
+    httpApi.addRoutes({
+      path: '/privacy_policy',
+      methods: [apig.HttpMethod.GET],
+      integration: new apigIntegrations.HttpLambdaIntegration('LambdaIntegration', hardinessZoneFunction),
+    });
 
     const hostedZone = route53.HostedZone.fromLookup(this, 'HostedZone', {
       domainName: props.domain,

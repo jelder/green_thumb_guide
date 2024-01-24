@@ -11,6 +11,8 @@ use hyper::StatusCode;
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
 use std::path::Path;
+use maud::{html, Markup};
+
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct ZipcodeLookupQuery {
@@ -85,6 +87,7 @@ async fn main() {
     let app = Router::new()
         .route("/", get(lookup_by_zipcode))
         .route("/hardiness_zone", get(lookup_by_zipcode))
+        .route("/privacy_policy", get(|| async { privacy_policy() }))
         .layer(Extension(pool));
 
     #[cfg(debug_assertions)]
@@ -111,4 +114,16 @@ fn first_existing_path(paths: &[&str]) -> Option<String> {
     paths.iter()
          .find(|&&path| Path::new(path).exists())
          .map(|&path| path.to_string())
+}
+
+fn privacy_policy() -> Markup {
+    html! {
+        head {
+            link rel="stylesheet" href="https://edwardtufte.github.io/tufte-css/tufte.css";
+        }
+        body {
+            h1 { "Privacy Policy" }
+            p { "This site does not collect any personal information." }
+        }
+    }
 }
