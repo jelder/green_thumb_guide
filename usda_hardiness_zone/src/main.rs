@@ -75,6 +75,8 @@ async fn lookup_by_zipcode(
 
 #[tokio::main]
 async fn main() {
+    eprintln!("Starting server...");
+
     // Connect to SQLite database
     let pool = SqlitePool::connect(
         &first_existing_path(&vec!["/opt/database/hardiness.db", "/opt/hardiness.db", "./hardiness.db"]).expect("Could not find database")
@@ -82,6 +84,7 @@ async fn main() {
 
     let app = Router::new()
         .route("/", get(lookup_by_zipcode))
+        .route("/hardiness_zone", get(lookup_by_zipcode))
         .layer(Extension(pool));
 
     #[cfg(debug_assertions)]
