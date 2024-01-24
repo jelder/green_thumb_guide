@@ -1,0 +1,16 @@
+{
+    "name": "Green Thumb Guide",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu-22.04",
+    "forwardPorts": [3000],
+    "portsAttributes": {
+        "3000": {
+            "label": "Preview",
+            "onAutoForward": "notify"
+        }
+    },
+    "features": {
+        "ghcr.io/devcontainers/features/aws-cli:1": {},
+        "ghcr.io/devcontainers/features/rust:1": {},
+        "ghcr.io/devcontainers/features/node:1": {}
+    }
+}
