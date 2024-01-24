@@ -28,7 +28,9 @@ export class GreenThumbGuideStack extends Stack {
       directory: "../usda_hardiness_zone/",
       logGroup: new logs.LogGroup(this, 'USDAHardinessZoneFunctionLogGroup'),
       timeout: Duration.seconds(3),
-      layers: [databaseLayer]
+      layers: [databaseLayer],
+      setupLogging: true,
+
     })
 
     const hardinessZoneFunctionUrl = new lambda.FunctionUrl(this, "USDAHardinessZoneFunctionUrl", {
