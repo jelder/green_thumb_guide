@@ -37,11 +37,13 @@ export class GreenThumbGuideStack extends Stack {
     })
     new CfnOutput(this, 'url', { value: hardinessZoneFunctionUrl.url });
 
-    const httpApi = new apig.HttpApi(this, 'GreenThumbGuideHttpApi');
+    const httpApi = new apig.HttpApi(this, 'GreenThumbGuideHttpApi', {
+      defaultAuthorizer: new apig.HttpNoneAuthorizer(),
+    });
 
     httpApi.addRoutes({
       path: '/hardiness_zone',
-      methods: [apig.HttpMethod.GET, apig.HttpMethod.POST],
+      methods: [apig.HttpMethod.GET],
       integration: new apigIntegrations.HttpLambdaIntegration('LambdaIntegration', hardinessZoneFunction),
     });
 
