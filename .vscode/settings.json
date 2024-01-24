@@ -1,5 +1,11 @@
 {
-    "cSpell.words": [
+        "rust-analyzer.rustfmt.overrideCommand": ["rustfmt"],
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "[rust]": {
+            "editor.formatOnSave": true,
+            "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        },
+        "cSpell.words": [
         "axum",
         "celsius",
         "fahrenheit",

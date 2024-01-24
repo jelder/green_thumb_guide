@@ -1,18 +1,16 @@
 use axum::response::IntoResponse;
 use axum::response::Response;
 use axum::{
-    routing::get,
-    Json,
-    Router,
-    extract::{Query, Extension},
     debug_handler,
+    extract::{Extension, Query},
+    routing::get,
+    Json, Router,
 };
 use hyper::StatusCode;
+use maud::{html, Markup};
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqlitePool;
 use std::path::Path;
-use maud::{html, Markup};
-
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 struct ZipcodeLookupQuery {
@@ -56,24 +54,22 @@ async fn lookup_by_zipcode(
     Query(params): Query<QueryParams>,
     Extension(pool): Extension<SqlitePool>,
 ) -> Response {
-    
-    let hardiness_zone = sqlx::query_as!(HardinessZone, "select zones.* from zones join zone_zipcodes on zone_id = zones.id where zipcode = $1", params.q)
-        .fetch_optional(&pool)
-        .await;
+    let hardiness_zone = sqlx::query_as!(
+        HardinessZone,
+        "select zones.* from zones join zone_zipcodes on zone_id = zones.id where zipcode = $1",
+        params.q
+    )
+    .fetch_optional(&pool)
+    .await;
 
     match hardiness_zone {
         Ok(Some(zone)) => {
             let result = ZipcodeLookupResult::from(zone);
             Json(result).into_response()
-        },
-        Err(err) => {
-            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
-        },
-        _ => {
-            StatusCode::NOT_FOUND.into_response()
         }
+        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
+        _ => StatusCode::NOT_FOUND.into_response(),
     }
-
 }
 
 #[tokio::main]
@@ -82,8 +78,15 @@ async fn main() {
 
     // Connect to SQLite database
     let pool = SqlitePool::connect(
-        &first_existing_path(&vec!["/opt/database/hardiness.db", "/opt/hardiness.db", "./hardiness.db"]).expect("Could not find database")
-    ).await.unwrap();
+        &first_existing_path(&vec![
+            "/opt/database/hardiness.db",
+            "/opt/hardiness.db",
+            "./hardiness.db",
+        ])
+        .expect("Could not find database"),
+    )
+    .await
+    .unwrap();
 
     let app = Router::new()
         .route("/", get(lookup_by_zipcode))
@@ -110,11 +113,11 @@ async fn main() {
     }
 }
 
-
 fn first_existing_path(paths: &[&str]) -> Option<String> {
-    paths.iter()
-         .find(|&&path| Path::new(path).exists())
-         .map(|&path| path.to_string())
+    paths
+        .iter()
+        .find(|&&path| Path::new(path).exists())
+        .map(|&path| path.to_string())
 }
 
 fn privacy_policy() -> Markup {
