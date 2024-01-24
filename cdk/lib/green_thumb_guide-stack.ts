@@ -61,6 +61,11 @@ export class GreenThumbGuideStack extends Stack {
       certificate,
     });
 
+    new apig.ApiMapping(this, 'HttpApiMapping', {
+      api: httpApi,
+      domainName,
+    })
+
     new route53.ARecord(this, 'CustomDomainAliasRecord', {
       zone: hostedZone,
       target: route53.RecordTarget.fromAlias(new targets.ApiGatewayv2DomainProperties(domainName.regionalDomainName, domainName.regionalHostedZoneId)),
