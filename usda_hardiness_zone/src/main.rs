@@ -37,7 +37,8 @@ struct HardinessZone {
 }
 
 fn fahrenheit_to_celsius(fahrenheit: f64) -> f64 {
-    (fahrenheit - 32.0) * 5.0 / 9.0
+    let c = (fahrenheit - 32.0) * 5.0 / 9.0;
+    (c * 100.0).round() / 100.0
 }
 
 impl From<HardinessZone> for ZipcodeLookupResult {

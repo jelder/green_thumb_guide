@@ -55,7 +55,7 @@ paths:
                     type: number
                     format: float
                     description: Lowest temperature in Celsius observed in the last 30 years.
-                    example: -20.555555555555557
+                    example: -20.56
         '400':
           description: Invalid ZIP code format.
         '404':
