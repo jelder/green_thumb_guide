@@ -22,12 +22,12 @@ export class GreenThumbGuideStack extends Stack {
       this,
       "HardinessZoneFunction",
       {
-        directory: "../usda_hardiness_zone/",
+        directory: "./usda_hardiness_zone/",
         logGroup: new logs.LogGroup(this, "HardinessZoneFunctionLogGroup"),
         timeout: Duration.seconds(3),
         layers: [
           new lambda.LayerVersion(this, "HardinessDatabaseLayer", {
-            code: lambda.Code.fromAsset("../usda_hardiness_zone/database.zip"),
+            code: lambda.Code.fromAsset("./usda_hardiness_zone/database.zip"),
           }),
         ],
         setupLogging: true,
