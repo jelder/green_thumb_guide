@@ -29,46 +29,35 @@ struct QueryParams {
     q: String,
 }
 
-struct HardinessZone {
-    id: String,
-    min_temp_f: f64,
-}
-
-fn fahrenheit_to_celsius(fahrenheit: f64) -> f64 {
-    let c = (fahrenheit - 32.0) * 5.0 / 9.0;
-    (c * 100.0).round() / 100.0
-}
-
-impl From<HardinessZone> for ZipcodeLookupResult {
-    fn from(hardiness_zone: HardinessZone) -> Self {
-        ZipcodeLookupResult {
-            zone: hardiness_zone.id.to_string(),
-            min_temp_f: hardiness_zone.min_temp_f,
-            min_temp_c: fahrenheit_to_celsius(hardiness_zone.min_temp_f),
-        }
-    }
-}
-
 #[debug_handler]
 async fn lookup_by_zipcode(
     Query(params): Query<QueryParams>,
     Extension(pool): Extension<SqlitePool>,
 ) -> Response {
-    let hardiness_zone = sqlx::query_as!(
-        HardinessZone,
+    let result = sqlx::query!(
         "select zones.* from zones join zone_zipcodes on zone_id = zones.id where zipcode = $1",
         params.q
     )
     .fetch_optional(&pool)
     .await;
 
-    match hardiness_zone {
-        Ok(Some(zone)) => {
-            let result = ZipcodeLookupResult::from(zone);
-            Json(result).into_response()
-        }
-        Err(err) => (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response(),
-        _ => StatusCode::NOT_FOUND.into_response(),
+    match result {
+        Ok(Some(hardiness_zone)) => Json(ZipcodeLookupResult {
+            zone: hardiness_zone.id.to_string(),
+            min_temp_f: hardiness_zone.min_temp_f,
+            min_temp_c: fahrenheit_to_celsius(hardiness_zone.min_temp_f),
+        })
+        .into_response(),
+        Err(err) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            simple_page("Internal Server Error", err.to_string().as_str()),
+        )
+            .into_response(),
+        _ => (
+            StatusCode::NOT_FOUND,
+            simple_page("Not Found", "The requested ZIP code could not be found."),
+        )
+            .into_response(),
     }
 }
 
@@ -78,7 +67,7 @@ async fn main() {
 
     // Connect to SQLite database
     let pool = SqlitePool::connect(
-        &first_existing_path(&vec![
+        &first_existing_path(&[
             "/opt/database/hardiness.db",
             "/opt/hardiness.db",
             "./hardiness.db",
@@ -91,7 +80,15 @@ async fn main() {
     let app = Router::new()
         .route("/", get(lookup_by_zipcode))
         .route("/hardiness_zone", get(lookup_by_zipcode))
-        .route("/privacy_policy", get(|| async { privacy_policy() }))
+        .route(
+            "/privacy_policy",
+            get(|| async {
+                simple_page(
+                    "Privacy Policy",
+                    "This site does not collect any personal information.",
+                )
+            }),
+        )
         .layer(Extension(pool));
 
     #[cfg(debug_assertions)]
@@ -113,6 +110,11 @@ async fn main() {
     }
 }
 
+fn fahrenheit_to_celsius(fahrenheit: f64) -> f64 {
+    let c = (fahrenheit - 32.0) * 5.0 / 9.0;
+    (c * 100.0).round() / 100.0
+}
+
 fn first_existing_path(paths: &[&str]) -> Option<String> {
     paths
         .iter()
@@ -120,14 +122,12 @@ fn first_existing_path(paths: &[&str]) -> Option<String> {
         .map(|&path| path.to_string())
 }
 
-fn privacy_policy() -> Markup {
+fn simple_page(title: &str, p: &str) -> Markup {
     html! {
-        head {
-            link rel="stylesheet" href="https://edwardtufte.github.io/tufte-css/tufte.css";
-        }
+        head { link rel="stylesheet" href="https://edwardtufte.github.io/tufte-css/tufte.css"; }
         body {
-            h1 { "Privacy Policy" }
-            p { "This site does not collect any personal information." }
+            h1 { (title) }
+            p { (p) }
         }
     }
 }
