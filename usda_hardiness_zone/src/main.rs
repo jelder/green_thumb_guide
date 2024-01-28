@@ -35,7 +35,12 @@ async fn lookup_by_zipcode(
     Extension(pool): Extension<SqlitePool>,
 ) -> Response {
     let result = sqlx::query!(
-        "select zones.* from zones join zone_zipcodes on zone_id = zones.id where zipcode = $1",
+        "
+            select zones.*
+            from zones
+            join zone_zipcodes on zone_id = zones.id
+            where zipcode = $1
+        ",
         params.q
     )
     .fetch_optional(&pool)
