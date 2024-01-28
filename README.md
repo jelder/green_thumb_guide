@@ -1,5 +1,7 @@
 # Green Thumb Guide
 
+![build](https://github.com/jelder/green_thumb_guide/actions/workflows/build.yml/badge.svg)
+
 A GPT for improving my gardening skills.
 
 ### [Message Green Thumb Guide](https://chat.openai.com/g/g-YxvD5D5dO-green-thumb-guide)

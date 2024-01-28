@@ -1,0 +1,53 @@
+name: CI
+
+on:
+    push:
+
+jobs:
+  check:
+    name: Format, Clippy
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+            profile: minimal
+            toolchain: stable
+            override: true
+            components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rs/cargo@v1
+        name: check
+        with:
+            command: check
+            args: --manifest-path usda_hardiness_zone/Cargo.toml
+      - uses: actions-rs/cargo@v1
+        name: fmt
+        with:
+            command: fmt
+            args: --manifest-path usda_hardiness_zone/Cargo.toml --all --check
+      - uses: actions-rs/cargo@v1
+        name: clippy
+        with:
+            command: clippy
+            args: --manifest-path usda_hardiness_zone/Cargo.toml
+
+  # test:
+  #   name: Test
+  #   runs-on: ubuntu-22.04
+  #   needs: [ check ]
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - uses: actions-rs/toolchain@v1
+  #       with:
+  #           profile: minimal
+  #           toolchain: stable
+  #           override: true
+  #     - uses: Swatinem/rust-cache@v2
+  #     - uses: actions-rs/cargo@v1
+  #       with:
+  #           command: test
+  #     - uses: actions-rs/cargo@v1
+  #       with:
+  #           command: test
+  #           args: --manifest-path usda_hardiness_zone/Cargo.toml --no-default-features
